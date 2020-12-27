@@ -1,12 +1,12 @@
 // Aliases & App initialization
 let Application = PIXI.Application,
-    Loader = PIXI.loader,
-    LoaderResources = PIXI.loader.resources,
+    // InteractionManager = PIXI.interaction.InteractionManager,
+    TextureCache = PIXI.utils.TextureCache,
     Sprite = PIXI.Sprite;
 
 const app = new PIXI.Application({
-  width: 640, 
-  height: 427,
+  width: 400, 
+  height: 400,
   antialias: true,
   transparent: false,
   resolution: 1
@@ -14,132 +14,185 @@ const app = new PIXI.Application({
 document.body.appendChild(app.view);
 
 
-// Keyboard function
-function keyboard(value) {
-  let key = {};
-  key.value = value;
-  key.isDown = false;
-  key.isUp = true;
-  key.press = undefined;
-  key.release = undefined;
-  //The `downHandler`
-  key.downHandler = event => {
-    if (event.key === key.value) {
-      if (key.isUp && key.press) key.press();
-      key.isDown = true;
-      key.isUp = false;
-      event.preventDefault();
-    }
-  };
-
-  //The `upHandler`
-  key.upHandler = event => {
-    if (event.key === key.value) {
-      if (key.isDown && key.release) key.release();
-      key.isDown = false;
-      key.isUp = true;
-      event.preventDefault();
-    }
-  };
-
-  //Attach event listeners
-  const downListener = key.downHandler.bind(key);
-  const upListener = key.upHandler.bind(key);
-  
-  window.addEventListener(
-    "keydown", downListener, false
-  );
-  window.addEventListener(
-    "keyup", upListener, false
-  );
-  
-  // Detach event listeners
-  key.unsubscribe = () => {
-    window.removeEventListener("keydown", downListener);
-    window.removeEventListener("keyup", upListener);
-  };
-  
-  return key;
-}
-
-let velocityX = 0;
-let velocityY = 0;
-
-let upKeyPress = keyboard('ArrowUp');
-let downKeyPress = keyboard('ArrowDown');
-upKeyPress.press = () => { velocityY -= 1;  }
-upKeyPress.release = () => { velocityY += 1; }
-downKeyPress.press = () => { velocityY += 1; }
-downKeyPress.release = () => { velocityY -= 1; }
-
-let leftKeyPress = keyboard('ArrowLeft');
-let rightKeyPress = keyboard('ArrowRight');
-leftKeyPress.press = () => { velocityX -= 1; }
-leftKeyPress.release = () => { velocityX += 1; }
-rightKeyPress.press = () => { velocityX += 1; }
-rightKeyPress.release = () => { velocityX -= 1; }
-
 
 // Pre-load all images
-Loader
-  .add([
-    "img/paris-bg.jpg",
-    "img/panda.png"
-  ])
-  .load(setup);
-let pandaSprite, bgSprite;
+PIXI.loader.add([
+  "img/course-square.png",
+  "img/assets-ball.json"
+]).load(setup);
+
+let courseSprite, 
+    ballSprite, previewSprite;
+
+
+
+// Data
+let dragStart = [0.0, 0.0]; // x & y mouse position
+let dragEnd = [0.0, 0.0];
+let ballVel = [0.0, 0.0];
+
+const MIN_X = 30;
+const MAX_X = 370;
+const MIN_Y = 30;
+const MAX_Y = 370;
+
+const LAUNCH_SPEED_FACTOR = 0.1;
+const FRICTION_ACCEL = 0.1; // (de) acceleration due to friction
+const DAMPING_COEF = 0.99;  // Just so that high speeds to deduce down
 
 
 
 // Setup call
 function setup () {
-  pandaSprite = new Sprite(LoaderResources["img/panda.png"].texture);
-  bgSprite = new Sprite(LoaderResources["img/paris-bg.jpg"].texture);
+  // The ball course will always be static in the background
+  courseSprite = new Sprite(TextureCache['img/course-square.png']);
+  app.stage.addChild(courseSprite);
 
-  app.stage.addChild(bgSprite);
-  app.stage.addChild(pandaSprite);
+  ballSprite = new Sprite(TextureCache['assets-ball.png']);
+  ballSprite.pivot.set(ballSprite.width / 2, ballSprite.height / 2);
+  ballSprite.x = app.view.width / 2;
+  ballSprite.y = app.view.height / 2;
 
-  pandaSprite.x = app.view.width / 2 - pandaSprite.width / 2;
-  pandaSprite.y = app.view.height / 2 - pandaSprite.height / 2;
-  // I can also use pivot
-  // pivot = image origin (affects translateion)
-  // anchor = rotation center (no change to translation)
-  // pandaSprite.anchor.set(0.5, 0.5);
-  // pandaSprite.rotation = 3.14159 / 2;
+  ballSprite.interactive = true;
+  ballSprite.buttonMode = true;
+  ballSprite.on('pointerdown', startSwing)
+            .on('pointermove', moveIndicator)
+            .on('pointerup', cancelSwing)
+            .on('pointerupoutside', endSwing)
+  app.stage.addChild(ballSprite);
 
+  previewSprite = new Sprite(TextureCache['ui-trajectory-ball.png']);
+  previewSprite.pivot.set(previewSprite.width / 2, previewSprite.height / 2);
+  previewSprite.visible = false;
+  app.stage.addChild(previewSprite);
 
-
-  // Put this at the end of setup so that it's guarnateed that setup finished
   app.ticker.add((delta) => gameLoop(delta));
 }
 
-// Loop
-const SPEED = 5;
-
 function gameLoop (delta) {
-  let actualVelX = velocityX;
-  let actualVelY = velocityY;
+  if (ballVel[0] != 0 || ballVel[1] != 0) {
+    doPhysicsTick();
+  }
+}
 
-  if (velocityX && velocityY) {
-    // Divide by sqrt(2) so that speed (Vx^2 + Vy^2 = 1)
-    actualVelX /= 1.41;
-    actualVelY /= 1.41;
+
+
+//
+// Physics
+//
+function doPhysicsTick () {
+  /*
+    Some things to note about this physics:
+    - It _must_ be deterministic
+    - All frames are considered equal time frames
+    - Physical accuracy is not necessary, it's for a game
+
+    Each physics call consists of:
+    TODO: Add subframes?
+    - Move forward
+    - Check for collision
+    - Reduce speed
+  */
+
+  /*
+  Move Forward
+  ============
+  Simply add ballVel to the current position
+  */
+  ballSprite.x += ballVel[0];
+  ballSprite.y += ballVel[1];
+
+  /*
+  Check for Collision
+  ===================
+  Right now we live in a square, so collisions
+  are just x & y inequalities
+  */
+  if (ballSprite.x - ballSprite.width / 2 <= MIN_X) {
+    ballSprite.x = MIN_X + ballSprite.width / 2;
+    ballVel[0] *= -1;
+  } else if (ballSprite.x + ballSprite.width / 2 >= MAX_X) {
+    ballSprite.x = MAX_X - ballSprite.width / 2;
+    ballVel[0] *= -1;
   }
 
-  pandaSprite.x += actualVelX * SPEED;
-  pandaSprite.y += actualVelY * SPEED;
+  if (ballSprite.y - ballSprite.height / 2 <= MIN_Y) {
+    ballSprite.y = MIN_Y + ballSprite.height / 2;
+    ballVel[1] *= -1;
+  } else if (ballSprite.y + ballSprite.height / 2 >= MAX_Y) {
+    ballSprite.y = MAX_Y - ballSprite.height / 2;
+    ballVel[1] *= -1;
+  }
+  
+  /*
+  Reduce Speed
+  ============
+  Normalize speed, multiply by friction
+  Then substract
+  - or -
+  if current speed < friction reduction 
+    speed -> 0
+  */
+  // Big sad that I have to use a sqrt but I think it's unavoidable
+  let ballSpeed = Math.sqrt(ballVel[0]*ballVel[0] + ballVel[1]*ballVel[1]);
 
-  // Making sure everything stays on screen
-  if (velocityX) {
-    let maxX = app.view.width - pandaSprite.width;
-    if (pandaSprite.x < 0) pandaSprite.x = 0;
-    else if (pandaSprite.x > maxX) pandaSprite.x = maxX;
+  if (ballSpeed < FRICTION_ACCEL) {
+    ballVel = [0, 0];
+  } else {
+    // let frictionForce = [-ballVel[0] / ballSpeed * FRICTION_ACCEL, -ballVel[1] / ballSpeed * FRICTION_ACCEL];
+    ballVel = [ballVel[0] * (1 - FRICTION_ACCEL / ballSpeed), ballVel[1] * (1 - FRICTION_ACCEL / ballSpeed)];
+    ballVel = [ballVel[0] * DAMPING_COEF, ballVel[1] * DAMPING_COEF];
   }
 
-  if (velocityY) {
-    let maxY = app.view.height - pandaSprite.height;
-    if (pandaSprite.y < 0) pandaSprite.y = 0;
-    else if (pandaSprite.y > maxY) pandaSprite.y = maxY;
-  }
 
+}
+
+
+
+
+//
+// Shot wind up
+//
+
+function startSwing (event) {
+  dragStart = [ballSprite.x, ballSprite.y];
+  previewSprite.visible = true;
+}
+
+function endSwing (event) {
+  let posDict = event.data.global;
+  dragEnd = [posDict.x, posDict.y];
+  previewSprite.visible = false;
+
+  // This starts the physics
+  ballVel = [dragStart[0] - dragEnd[0], dragStart[1] - dragEnd[1]];
+  ballVel[0] *= LAUNCH_SPEED_FACTOR;
+  ballVel[1] *= LAUNCH_SPEED_FACTOR;
+}
+
+function moveIndicator (event) {
+  // Quick Maths here we go
+  /*
+    Basically, we want to draw the trajIndicator to be across the
+    the ball.
+    T = indicator, X = ball, M = mouse
+
+      T    
+       \
+        X
+         \
+          M
+
+    M -> X = X -> T,
+    X + (M -> x) = position of T
+  */
+  let mousePosDict = event.data.global;
+  let MtoX = [ballSprite.x - mousePosDict.x, ballSprite.y - mousePosDict.y];
+  previewSprite.position.set(ballSprite.x + MtoX[0], ballSprite.y + MtoX[1]);
+}
+
+function cancelSwing (event) {
+  endSwing(event);
+  // previewSprite.visible = false;
+  // console.log("Cancelled");
 }
