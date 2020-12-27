@@ -1,0 +1,19 @@
+{
+  "name": "learning-pixi",
+  "version": "1.0.0",
+  "description": "A dummy project to learn pixi.js",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server",
+    "dev": "nodemon server"
+  },
+  "keywords": [
+    "Pixi",
+    "Learning"
+  ],
+  "author": "Michael Gorbunov",
+  "license": "CC0-1.0",
+  "dependencies": {
+    "nodemon": "^2.0.6"
+  }
+}
