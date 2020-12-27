@@ -15,6 +15,6 @@
   "license": "CC0-1.0",
   "dependencies": {
     "nodemon": "^2.0.6",
-    "pixi.js": "^4.8.9"
+    "pixi.js": "4.8.9"
   }
 }
