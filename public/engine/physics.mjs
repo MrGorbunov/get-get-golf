@@ -91,7 +91,7 @@ That is why there is so much sanitation. Robustness is far more important than
 time complexity here.
 */
 
-function generatePoint (x, y) {
+export function generatePoint (x, y) {
   if (typeof x !== 'number') throw 'x of circle position must be a number!';
   if (typeof y !== 'number') throw 'y of circle position must be a number!';
 
@@ -100,7 +100,7 @@ function generatePoint (x, y) {
 
 
 
-function generateCircle (x, y, radius) {
+export function generateCircle (x, y, radius) {
   if (typeof x !== 'number') throw 'x of circle position must be a number!';
   if (typeof y !== 'number') throw 'y of circle position must be a number!';
   if (typeof radius !== 'number') throw 'radius of circle must be a number!';
@@ -126,7 +126,7 @@ function generateCircle (x, y, radius) {
  * 
  * clockwisePointArray assumes its inputs are pointDicts.
  */
-function generateSegmentsArray (clockwisePointArray, closeLoop = true) {
+export function generateSegmentsArray (clockwisePointArray, closeLoop = true) {
   const NUM_POINTS = clockwisePointArray.length;
   if (NUM_POINTS < 2) throw 'clockwisePointArray must be at least length 2 (aka a single segment)'
 
@@ -190,7 +190,7 @@ function generateSegmentsArray (clockwisePointArray, closeLoop = true) {
  * the collision _will_ still register, i.e. collisions
  * here are 2-sided.
  */
-function isColliding (segment, circle) {
+export function isColliding (segment, circle) {
   /*
   Lmao this math is on paper
 
@@ -239,8 +239,6 @@ function isColliding (segment, circle) {
 
 
 
-
-module.exports = { generatePoint, generateCircle, generateSegmentsArray, isColliding };
 
 
 

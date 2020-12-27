@@ -17,6 +17,7 @@ const server = http.createServer((req, res) => {
 
   switch (fileExt) {
     case '.js':
+    case '.mjs':
       contentType = "text/javascript";
       break;
     case '.css':
