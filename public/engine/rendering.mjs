@@ -17,7 +17,7 @@ pixi.min.js _must_ have been called prior to this.
 const Graphics = new PIXI.Graphics();
 const PALLETE = {
   'background': 0x1E252F,
-  'foreground': 0x7AD585,
+  'obstacle': 0x7AD585,
   'ball': 0xB786AD
 }
 
@@ -29,7 +29,37 @@ export function getGraphicsObject () {
 
 
 
-Graphics.beginFill(PALLETE.ball);
-Graphics.drawRect(50, 50, 100, 100);
-Graphics.endFill();
+
+
+//
+// Actual Drawing
+//
+
+export function drawCircle (circle) {
+  Graphics.beginFill(PALLETE.ball);
+  Graphics.drawCircle(circle.center.x, circle.center.y, circle.radius);
+}
+
+export function drawSegment (segment) {
+  Graphics.lineStyle(2, PALLETE.obstacle);
+  Graphics.moveTo(segment.pointA.x, segment.pointA.y);
+  Graphics.lineTo(segment.pointB.x, segment.pointB.y);
+}
+
+export function drawSegmentArray (segmentArray, fillIn=true) {
+  if (fillIn) {
+    Graphics.beginFill(PALLETE.obstacle);
+    let firstPoint = segmentArray[0].pointA;
+    Graphics.moveTo(firstPoint.x, firstPoint.y);
+
+    segmentArray.forEach((segment) => {
+      Graphics.lineTo(segment.pointB.x, segment.pointB.y);
+    });
+    Graphics.closePath();
+    Graphics.endFill();
+
+  } else {
+    segmentArray.forEach((segment) => {drawSegment(segment)});
+  }
+}
 

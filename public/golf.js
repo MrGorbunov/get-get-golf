@@ -12,8 +12,34 @@ document.body.appendChild(app.view);
 app.stage.addChild(graphics.getGraphicsObject());
 
 
+let golfBall = sim.generateCircle(50, 50, 5);
 
-/*
-Construct a circle, and draw it to the screen.
-*/
+let hipAndRadShape = sim.generateSegmentsArray([
+  sim.generatePoint(10, 10),
+  sim.generatePoint(10, 20),
+  sim.generatePoint(0, 40)
+]);
 
+graphics.drawSegmentArray(hipAndRadShape);
+graphics.drawCircle(golfBall);
+
+
+
+
+PIXI.loader.load(setup);
+var scale = 0.3;
+var xPos = 0;
+
+
+function setup () {
+  // okie
+
+  app.ticker.add((delta) => gameLoop(delta));
+}
+
+function gameLoop (delta) {
+  scale *= 1.003;
+  xPos += 0.3;
+  app.stage.scale.set(scale, scale);
+  app.stage.position.set(xPos, 0);
+}
