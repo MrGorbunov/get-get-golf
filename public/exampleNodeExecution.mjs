@@ -17,4 +17,13 @@ testing so this is a useful litmus test.
 
 import * as sim from './engine/physics.mjs';
 
-console.log(sim.generateCircle(10, 10, 3));
+let myCirc = sim.generateCircle(50, 50, 10);
+let myShape = sim.generateSegmentsArray([
+    sim.generatePoint(0, 0),
+    sim.generatePoint(100, 0),
+    sim.generatePoint(100, 100),
+    sim.generatePoint(25, 100),
+    sim.generatePoint(0, 75)
+  ]);
+
+console.log(myShape);

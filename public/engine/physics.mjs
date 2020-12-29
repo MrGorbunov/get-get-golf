@@ -183,7 +183,7 @@ export function generateSegmentsArray (clockwisePointArray, closeLoop = true) {
 */
 
 /**
- * Determins whether the circle is colliding with
+ * Determines whether the circle is colliding with
  * the given segment.
  * 
  * If the circle is on the wrong side of the segment,
