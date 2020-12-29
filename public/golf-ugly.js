@@ -21,7 +21,7 @@ var golfBall_graphic,
     gameplayGraphics;
 
 
-var mousePos = {'x': 1};
+var mousePos = {x:1, y: 2};
 
 
 function setup () {
@@ -29,10 +29,10 @@ function setup () {
   golfBall_sim = SIM.generateCircle(50, 50, 10);
   levelBorder_sim = SIM.generateSegmentsArray([
     SIM.generatePoint(0, 0),
-    SIM.generatePoint(0, 75),
-    SIM.generatePoint(25, 100),
+    SIM.generatePoint(100, 0),
     SIM.generatePoint(100, 100),
-    SIM.generatePoint(100, 0)
+    SIM.generatePoint(25, 100),
+    SIM.generatePoint(0, 75)
   ]);
 
   level_graphic = new PIXI.Graphics();
@@ -54,24 +54,29 @@ function setup () {
   gameplayGraphics.on('pointermove', event => recordMousePosition(event));
 
   document.body.appendChild(app.view);
-  app.ticker.add((delta) => gameLoop(delta));
+  // app.ticker.add((delta) => gameLoop(delta));
+  gameLoop(1);
 }
 
 function gameLoop (delta) {
-  if (mousePos.x < 0 || mousePos.x > app.view.width ||
-      mousePos.y < 0 || mousePos.y > app.view.height)
-        return;
+  // if (mousePos.x < 0 || mousePos.x > app.view.width ||
+  //     mousePos.y < 0 || mousePos.y > app.view.height)
+  //       return;
   
-  let actualPosition = gameplayGraphics.toLocal(mousePos);
-  golfBall_sim.x = actualPosition.x;
-  golfBall_sim.y = actualPosition.y;
+  // let actualPosition = gameplayGraphics.toLocal(mousePos);
+  // actualPosition.x -= 40;
+  // actualPosition.y -= 40;
+  // golfBall_sim.x = actualPosition.x;
+  // golfBall_sim.y = actualPosition.y;
   
-  golfBall_graphic.position.set(actualPosition.x, actualPosition.y);
+  // golfBall_graphic.position.set(actualPosition.x, actualPosition.y);
 
   var isCollision = false;
   levelBorder_sim.forEach((segment) => {
     if (SIM.isColliding(segment, golfBall_sim)) {
-      // console.log("Collision found");
+      console.log("Collision found between: ");
+      console.log(segment);
+      console.log(golfBall_sim);
       // console.log(segment);
       isCollision = true;
     }
