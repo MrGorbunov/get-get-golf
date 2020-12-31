@@ -56,7 +56,8 @@ let gameModel = {
 
 let simConstants = {
   launchSpeed: 100,
-  friction: 0
+  friction: 0,
+  dampingCoef: 1
 }
 
 // Currently only contains segment arrays, all of which are
@@ -65,20 +66,46 @@ let simConstants = {
 // In the future should also have an outer bounding box
 let simStatics = {
   walls: [
-    /*
-    This is the configuration
+   {
+    pointA: { x: 50, y: 0 },
+    pointB: { x: 100, y: 0 },
+    normal: { x: 0, y: 1 }
+  },
+  {
+    pointA: { x: 100, y: 0 },
+    pointB: { x: 100, y: 50 },
+    normal: { x: -1, y: 0 }
+  },
+  {
+    pointA: { x: 100, y: 50 },
+    pointB: { x: 50, y: 50 },
+    normal: { x: 0, y: -1 }
+  },
+  {
+    pointA: { x: 50, y: 50 },
+    pointB: { x: 50, y: 100 },
+    normal: { x: -1, y: 0 }
+  },
+  {
+    pointA: { x: 50, y: 100 },
+    pointB: { x: 0, y: 100 },
+    normal: { x: 0, y: -1 }
+  },
+  {
+    pointA: { x: 0, y: 100 },
+    pointB: { x: 0, y: 50 },
+    normal: { x: 1, y: 0 }
+  },
+  {
+    pointA: { x: 0, y: 50 },
+    pointB: { x: 50, y: 0 },
+    normal: { x: 0.7071067811865475, y: 0.7071067811865475 }
+  }
 
-      --------
-      |      |
-      |      |
-       \     |
-         \___|
-    */
-    { pointA: {x:0, y:0},     pointB: {x:100, y:0},   normal: {x:0, y:-1} },
-    { pointA: {x:100, y:0},   pointB: {x:100, y:100}, normal: {x:-1, y:0} },
-    { pointA: {x:100, y:100}, pointB: {x:25, y:100},  normal: {x:0, y:1} },
-    { pointA: {x:25, y:100},  pointB: {x:0, y:75},    normal: {x:0.707107, y:-0.707107} },
-    { pointA: {x:0, y:75},    pointB: {x:0, y:0},     normal: {x:1, y:0} },
+
+    
+
+
   ],
 
   obstacles: [
@@ -88,8 +115,8 @@ let simStatics = {
 
 let simDynamics = {
   ball: {
-    pos: {x: 20, y:50},
-    vel: {x: 1, y:2.5},
+    pos: {x: 40, y:40},
+    vel: {x: 1, y:1},
     radius: 10,
   }
 }
@@ -160,6 +187,10 @@ function generateDebugBallContainer (ballDict) {
 // Physics
 //
 
+// When a value is considered 0
+const EPSILON_ZERO = 0.00001;
+
+
 function doPhysicsTick (simConstants, simStatics, simDynamics) {
   /*
   Roughly, this loop likes this:
@@ -174,40 +205,68 @@ function doPhysicsTick (simConstants, simStatics, simDynamics) {
   // TODO: Actually do subframes
   // Move forward
   let ball = simDynamics.ball;
-  let oldBall = {...simDynamics.ball};  // Create new dict object 
-  oldBall.pos = {...simDynamics.ball.pos}; // pos is a dict, so when copied above it's by reference
+  // const MAX_DIST_PER_SUBFRAME = ball.radius * 0.5;
+  const MAX_DIST_PER_SUBFRAME = ball.radius;
 
-  ball.pos.x += ball.vel.x;
-  ball.pos.y += ball.vel.y;
+  let speed = Math.sqrt(ball.vel.x**2  + ball.vel.y**2);
+  let totalDistanceLeft = speed; 
 
-  // Check for collision
-  // TODO: Account for multiple walls found
-  let collisionSegment = null;
-  simStatics.walls.forEach((segment) => {
-    if (isColliding(segment, ball)) {
-      collisionSegment = segment;
+  const MAX_SUBFRAMES = 20;
+  var subFrame = 0;
+  for (; subFrame<MAX_SUBFRAMES; subFrame++) {
+    if (totalDistanceLeft < EPSILON_ZERO) {
+      break;
     }
-  });
 
-  if (collisionSegment !== null) {
-    // console.log("Bruh collision");
-    // console.log(ball);
-    // console.log(oldBall);
-    handleCollision(collisionSegment, ball, oldBall);
+    let normalizedVel = {...ball.vel};
+    normalizeVector(normalizedVel);
+    let adjustedVel = {...ball.vel};
+
+    let distanceMoved = 0;
+    let oldBall = {...ball};
+    oldBall.pos = {...ball.pos}; // pos is a dict, so when copied above it's by reference
+
+    if (speed <= MAX_DIST_PER_SUBFRAME) {
+      distanceMoved = speed;
+    } else {
+      distanceMoved = MAX_DIST_PER_SUBFRAME;
+      adjustedVel.x = normalizedVel.x * MAX_DIST_PER_SUBFRAME;
+      adjustedVel.y = normalizedVel.y * MAX_DIST_PER_SUBFRAME;
+    }
+
+    ball.pos.x += adjustedVel.x;
+    ball.pos.y += adjustedVel.y;
+
+
+    // Check for collision
+    let collidingSegments = [];
+    simStatics.walls.forEach((segment) => {
+      if (calculateCollisionInfo(segment, ball).colliding) {
+        collidingSegments.push(segment);
+      }
+    });
+
+    if (collidingSegments.length > 0) {
+      // distanceMoved = handleCollision(collidingSegments, ball, oldBall);
+      handleCollision(collidingSegments, ball, oldBall);
+    }
+
+    totalDistanceLeft -= distanceMoved;
   }
 
+  // console.log(`Ball Vel X: ${ball.vel.x}`);
 
-  // Adjust velocity
-  let speed = Math.sqrt(ball.vel.x**2 + ball.vel.y**2);
+
+  // Slow down the ball
   if (speed <= simConstants.friction) {
     ball.vel.x = 0;
     ball.vel.y = 0;
   } else {
-    const factor = 1 - simConstants.friction / speed;
+    let factor = 1 - simConstants.friction / speed;
+    factor *= simConstants.dampingCoef;
     ball.vel.x *= factor;
     ball.vel.y *= factor;
   }
-
 }
 
 /**
@@ -218,28 +277,26 @@ function doPhysicsTick (simConstants, simStatics, simDynamics) {
  * 
  * Returns the distance travelled (i.e. distance from oldCircle to collision segment)
  */
-function handleCollision (segment, circle, oldCircle) {
+function handleCollision (segmentArr, circle, oldCircle) {
   /*
   1. Find position when collision first occurs, move ball there
   2. Find correct reflected velocity, set velocity to be reflected velocity
   3. Return the distance travelled
   */
 
-  // console.log("Handling new collision!");
-  // console.log("Segment: ", segment);
-  // console.log(`circle in segment: (${circle.pos.x}, ${circle.pos.y})`);
-  // console.log(`safe circle: (${oldCircle.pos.x}, ${oldCircle.pos.y})`);
-
   /* 
   Step 1. Determine position of collision
   =======
   This is done with a binary search (BS) between oldCircle & circle position.
+  At some point between ogPosition & finalPosition isColliding() begins returning
+  true. The BS searches for that position as a percentage of the displacement.
   */
   const BS_DEPTH = 6;
   let percentDistance = 0;
 
   let ogPosition = oldCircle.pos;
   let finalPosition = circle.pos;
+  let collisionNormal = segmentArr[0].normal;
 
   for (let bsStep=1; bsStep<=BS_DEPTH; bsStep++) {
     let testPercent = percentDistance + 1 / 2**bsStep;
@@ -249,7 +306,21 @@ function handleCollision (segment, circle, oldCircle) {
       y: ogPosition.y + testPercent*(finalPosition.y - ogPosition.y)
     }
 
-    if (!isColliding(segment, lerpedCircle)) {
+    let collisionOccured = false;
+    for (var segIndex in segmentArr) {
+      const seg = segmentArr[segIndex];
+      // If collision exitst
+      let collisionInfo = calculateCollisionInfo(seg, lerpedCircle) 
+      if (collisionInfo.colliding) {
+        collisionOccured = true;
+        collisionNormal = collisionInfo.normal;
+        break;
+      }
+    }
+
+    if (collisionOccured) {
+      continue;
+    } else {
       percentDistance += 1 / 2**bsStep;
     }
   }
@@ -264,7 +335,6 @@ function handleCollision (segment, circle, oldCircle) {
 
   // Ultimately we need to update the incoming circle
   circle.pos = collisionPos;
-  // console.log("Final BSed Position: ", collisionPos);
 
 
   /*
@@ -287,27 +357,36 @@ function handleCollision (segment, circle, oldCircle) {
   xo -= 2*(vo*n) * xn
   yo -= 2*(vo*n) * yn
   */
-  // TODO: Implement specific cases (reflect x & y)?
-  const DOT_VALUE = dotProduct(segment.normal, circle.vel);
-  circle.vel.x -= 2*segment.normal.x*DOT_VALUE;
-  circle.vel.y -= 2*segment.normal.y*DOT_VALUE;
-
-  // console.log("Reflected velocity: ", circle.vel);
+  // TODO: Implement specific cases (vel.x *= -1 & vel.y *= -1)?
+  const DOT_VALUE = dotProduct(collisionNormal, circle.vel);
+  circle.vel.x -= 2*collisionNormal.x*DOT_VALUE;
+  circle.vel.y -= 2*collisionNormal.y*DOT_VALUE;
 
 
   return DISTANCE_TO_COLLISION;
 }
 
-
 /**
  * Determines whether the circle is colliding with
- * the given segment.
+ * the given segment. Return is NOT boolean.
+ * 
+ * Return looks like this:
+ * {
+ *  colliding: true/false,
+ *  normal: {x: num, y:num}
+ * }
  * 
  * If the circle is on the wrong side of the segment,
  * the collision _will_ still register, i.e. collisions
  * here are 2-sided.
  */
-function isColliding (segment, circle) {
+function calculateCollisionInfo (segment, circle) {
+  // Default value is no collision
+  let collisionData = {
+    colliding: false,
+    normal: {x:0, y: 0}
+  }
+
   /*
   Lmao this math is on paper
 
@@ -324,7 +403,7 @@ function isColliding (segment, circle) {
   let v1 = subtractVectors(segment.pointA, circle.pos);
   let distance = Math.abs(dotProduct(segment.normal, v1));
   if (distance > circle.radius) {
-    return false;
+    return collisionData;
   }
 
 
@@ -336,14 +415,31 @@ function isColliding (segment, circle) {
   let dotA = dotProduct(v1, segVec);
   let dotB = dotProduct(v2, segVec);
   if ((dotA <= 0 && dotB >= 0) || (dotA >= 0 && dotB <= 0)) {
-    return true;
+    collisionData.colliding = true;
+    collisionData.normal = segment.normal;
+    return collisionData;
   }
 
   
   // Check 3, collision with endpoints
   // this is the final check to be exhaustive about collisions
-  return (sqDistanceBetweenPoints(segment.pointA, circle.pos) <= circle.radius**2 ||
-          sqDistanceBetweenPoints(segment.pointB, circle.pos) <= circle.radius**2)
+  let intersectsPointA = sqDistanceBetweenPoints(segment.pointA, circle.pos) <= circle.radius**2;
+  let intersectsPointB = sqDistanceBetweenPoints(segment.pointB, circle.pos) <= circle.radius**2;
+  
+  if (intersectsPointA) {
+    collisionData.colliding = true;
+    // Order matters!!!
+    let colNormal = subtractVectors(circle.pos, segment.pointA);
+    normalizeVector(colNormal);
+    collisionData.normal = colNormal;
+  } else if (intersectsPointB) {
+    collisionData.colliding = true;
+    let colNormal = subtractVectors(circle.pos, segment.pointB);
+    normalizeVector(colNormal)
+    collisionData.normal = colNormal;
+  }
+
+  return collisionData;
 }
 
 
@@ -361,6 +457,16 @@ function dotProduct (vecA, vecB) {
  */
 function subtractVectors (vecA, vecB) {
   return {'x': vecA.x - vecB.x, 'y': vecA.y - vecB.y};
+}
+
+function normalizeVector (vec) {
+  if (Math.abs(vec.x) <= EPSILON_ZERO && Math.abs(vec.y) <= EPSILON_ZERO) {
+    return;
+  }
+
+  const length = Math.sqrt(vec.x * vec.x + vec.y * vec.y);
+  vec.x /= length;
+  vec.y /= length;
 }
 
 
