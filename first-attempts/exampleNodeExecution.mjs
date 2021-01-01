@@ -19,11 +19,13 @@ import * as sim from './engine/physics.mjs';
 
 let myCirc = sim.generateCircle(50, 50, 10);
 let myShape = sim.generateSegmentsArray([
-    sim.generatePoint(0, 0),
+    sim.generatePoint(50, 0),
     sim.generatePoint(100, 0),
-    sim.generatePoint(100, 100),
-    sim.generatePoint(25, 100),
-    sim.generatePoint(0, 75)
+    sim.generatePoint(100, 50),
+    sim.generatePoint(50, 50),
+    sim.generatePoint(50, 100),
+    sim.generatePoint(0, 100),
+    sim.generatePoint(0, 50)
   ]);
 
 console.log(myShape);

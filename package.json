@@ -1,7 +1,7 @@
 {
-  "name": "learning-pixi",
+  "name": "get-get-golf",
   "version": "1.0.0",
-  "description": "A dummy project to learn pixi.js",
+  "description": "A mini golf game you can play with friends",
   "main": "server.js",
   "scripts": {
     "start": "node server",
@@ -9,7 +9,8 @@
   },
   "keywords": [
     "Pixi",
-    "Learning"
+    "Learning",
+    "Golf"
   ],
   "author": "Michael Gorbunov",
   "license": "CC0-1.0",

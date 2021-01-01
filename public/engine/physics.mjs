@@ -1,40 +1,34 @@
 /*
-Collisions.js
+Physics.mjs
 
-This file contains functions to produce shapes (dicts) and
-then check for collisions. Because this engine is for a golf 
-game, the only collision detection necessary is between
-these polygons & a circle.
+This file exports functions that
+ - Generate game state dictionaries
+ - Handle collisions between the ball & level
 
-Polyongs do NOT necessarily have to be convex. When
-created, they are stored as dicts of line segments.
-Collision is done by looping against every segment,
-there is NO notion of inside vs outside a shape.
+Internally there are also some useful math functions but
+they are only relevant for this file, and so are not
+exported. 
 
-Additionally, instead of classes this file contains
-functions that operate on dicts. These are what the
-dicts looks like:
+One day (probably when creating the playback engine)
+it will be useful to pull them out into a utility file.
 
-Segment Array (remember, there is no notion of open vs closed shape) 
-- normal is always normalized
-[
-  {'pointA': {'x': 1, 'y': 2},  'pointB': {'x': 23, 'y': 2},  'normal': {0, 1} }, 
-  {'pointA': {'x': 23, 'y': 2},  'pointB': {'x': 23, 'y': 20},  'normal': {1, 0} }
-]
+Instead of classes, this entire engine operates on dicts. Here
+is a list of all dicts:
 
-Point (and Vector) Dict
-{
-  'x': 2,
-  'y': 4
+// Everything lives in 2D for now
+position: {x: num, y: num}
+velocity: {x: num, y: num}
+
+circle: {
+  pos: {..},
+  radius: {..},
+  [vel: {..}]
 }
 
-Circle Dict
-{ 
-  'center': {
-    'x': 0,
-    'y': 3
-  }
-  'radius': 2
+segment: {
+  pointA: {..},
+  pointB: {..},
+  normal: {..}    <= Always normalized
 }
 */
 
@@ -42,155 +36,221 @@ Circle Dict
 
 
 
+// TODO: Generator functions
+
+
+
 //
-// Internal Utility Functions
+// Physics Constants
 //
 
 /*
-These guys don't get exported
+Engine constants:
+Mostly just epsilons for float comparisons. They should not
+be adjusted as they are set for stability.
 */
 
-function lengthOfVector (vec) {
-  return Math.sqrt(vec.x**2 + vec.y**2);
+const EPSILON_ZERO = 0.00001;
+
+
+/*
+Gameplay constants:
+Stuff like friction, damping, etc. Tweaking these is a game-design
+decision and the engine should work with all values of these.
+*/
+
+// TODO: Maybe this should be generated and passed into functions?
+const GAMEPLAY_CONSTANTS = {
+  launchSpeed: 100,
+  friction: 0.06,
+  dampingCoef: 0.99 // Should be on range (0, 1], and ideally close to 1 (0.999 is good)
 }
 
-/**
- * Returns A - B
- * i.e. B -> A
- */
-function subtractVectors (vecA, vecB) {
-  return generatePoint(vecA.x - vecB.x, vecA.y - vecB.y);
+
+
+
+
+
+
+
+
+//
+// Math Utility Functions
+//
+// All functoins return their value, there are NO mutations
+
+function sqDistanceBetweenPoints (pointA, pointB) {
+  return (pointA.x - pointB.x)**2 + (pointA.y - pointB.y)**2;
 }
 
 function distanceBetweenPoints (pointA, pointB) {
   return Math.sqrt((pointA.x - pointB.x)**2 + (pointA.y - pointB.y)**2);
 }
 
-function sqDistanceBetweenPoints (pointA, pointB) {
-  return (pointA.x - pointB.x)**2 + (pointA.y - pointB.y)**2;
+function sqLengthOfVector (vec) {
+  return vec.x**2 + vec.y**2;
+}
+
+function lengthOfVector (vec) {
+  return Math.sqrt(vec.x**2 + vec.y**2);
 }
 
 function dotProduct (vecA, vecB) {
   return vecA.x * vecB.x + vecA.y * vecB.y;
 }
 
+/**
+ * Returns A - B
+ * i.e. the vector from B -> A
+ */
+function differenceVector (vecA, vecB) {
+  return {'x': vecA.x - vecB.x, 'y': vecA.y - vecB.y};
+}
+
+function normalizedVector (vec) {
+  if (Math.abs(vec.x) <= EPSILON_ZERO && Math.abs(vec.y) <= EPSILON_ZERO) {
+    return {x: 0, y:0};
+  }
+  
+  let localVec = {...vec}
+  const length = lengthOfVector(localVec);
+  localVec.x /= length;
+  localVec.y /= length;
+  return localVec;
+}
+
+
+
+
 
 
 
 
 
 //
-// Generator Functions
+// Collisions
 //
-
-/*
-These functions will only be called when the scene is initialized, afterwards
-everything is stored in memory in the dicts & arrays.
-
-That is why there is so much sanitation. Robustness is far more important than
-time complexity here.
-*/
-
-export function generatePoint (x, y) {
-  if (typeof x !== 'number') throw 'x of circle position must be a number!';
-  if (typeof y !== 'number') throw 'y of circle position must be a number!';
-
-  return {'x': x, 'y': y};
-}
-
-
-
-export function generateCircle (x, y, radius) {
-  if (typeof x !== 'number') throw 'x of circle position must be a number!';
-  if (typeof y !== 'number') throw 'y of circle position must be a number!';
-  if (typeof radius !== 'number') throw 'radius of circle must be a number!';
-  // Technically using radius 0 may be useful for point collision detection
-  // but that's not necessary for what I'm doing right now
-  if (radius <= 0) throw 'radius of circle must be greater than 0!';
-
-  return {
-    'center': {'x': x, 'y': y},
-    'radius': radius
-  };
-}
-
-
 
 /**
- * clockwisePointArray must have the points in clockwise
- * order. The resulting shape can be concave! It's just
- * the points must connect and in a generally clockwise order.
+ * Oh boy this one is a bit of a woozy.
+ * It updates circle in 2 ways
+ *  - position => position at boundary collision
+ *  - velocity => reflected velocity
  * 
- * closeLoop if true, will create an edge between the first &
- * last point in the supplied point array.
- * 
- * clockwisePointArray assumes its inputs are pointDicts.
+ * Returns the distance travelled (i.e. distance from oldCircle to collision segment)
  */
-export function generateSegmentsArray (clockwisePointArray, closeLoop = true) {
-  const NUM_POINTS = clockwisePointArray.length;
-  if (NUM_POINTS < 2) throw 'clockwisePointArray must be at least length 2 (aka a single segment)'
+function handleCollision (segmentArr, circle, oldCircle) {
+  /*
+  1. Find position when collision first occurs, move ball there
+  2. Find correct reflected velocity, set velocity to be reflected velocity
+  3. Return the distance travelled
+  */
 
-  let segmentsArray = [];
+  /* 
+  Step 1. Determine position of collision
+  =======
+  This is done with a binary search (BS) between oldCircle & circle position.
+  At some point between ogPosition & finalPosition isColliding() begins returning
+  true. The BS searches for that position as a percentage of the displacement.
+  */
+  const BS_DEPTH = 6;
+  let percentDistance = 0;
 
-  for (let i=0; i<NUM_POINTS; i++) {
-    if (i + 1 == NUM_POINTS && !closeLoop) break;
+  let ogPosition = oldCircle.pos;
+  let finalPosition = circle.pos;
+  let collisionNormal = segmentArr[0].normal;
 
-    let pointA = clockwisePointArray[i];
-    let pointB = clockwisePointArray[(i+1) % NUM_POINTS];
+  for (let bsStep=1; bsStep<=BS_DEPTH; bsStep++) {
+    let testPercent = percentDistance + 1 / 2**bsStep;
+    let lerpedCircle = {...circle};
+    lerpedCircle.pos = {
+      x: ogPosition.x + testPercent*(finalPosition.x - ogPosition.x),
+      y: ogPosition.y + testPercent*(finalPosition.y - ogPosition.y)
+    }
 
-    /*
-    vector of line = B -> A = A - B
-                   = <pA.x - pB.x,  pA.y - pB.y>    *sign matters*
-    normal of vector = vec X <0, 0, 1> = <y, -x>
-    final vector = <pA.y - pB.y, pB.x - pA.x>
-    */
-    let normalVec = generatePoint(pointA.y - pointB.y, pointB.x - pointA.x);
+    let collisionOccured = false;
+    for (var segIndex in segmentArr) {
+      const seg = segmentArr[segIndex];
+      // If collision exitst
+      let collisionInfo = calculateCollisionInfo(seg, lerpedCircle) 
+      if (collisionInfo.colliding) {
+        collisionOccured = true;
+        collisionNormal = collisionInfo.normal;
+        break;
+      }
+    }
 
-    /*
-    |V| = sqrt(x^2 + y^2)
-    normalized (V) = V / |V|
-    */
-    let sizeOfNormalVec = Math.sqrt(normalVec.x**2 + normalVec.y**2);
-    normalVec.x /= sizeOfNormalVec;
-    normalVec.y /= sizeOfNormalVec;
-
-    segmentsArray.push({
-      'pointA': pointA,
-      'pointB': pointB,
-      'normal': normalVec
-    });
+    if (collisionOccured) {
+      continue;
+    } else {
+      percentDistance += 1 / 2**bsStep;
+    }
   }
 
-  return segmentsArray;
+  let collisionPos = {x: 0, y:0};
+  collisionPos.x = ogPosition.x + percentDistance*(finalPosition.x - ogPosition.x);
+  collisionPos.y = ogPosition.y + percentDistance*(finalPosition.y - ogPosition.y);
+  
+  // This gets returned at the end
+  const DISTANCE_TO_COLLISION = percentDistance * Math.sqrt(
+      sqDistanceBetweenPoints(collisionPos, ogPosition));
+
+  // Ultimately we need to update the incoming circle
+  circle.pos = collisionPos;
+
+
+  /*
+  Step 2. Find correct reflected velocity
+  =======
+  This is a simple plug & chug:
+  incoming velocity  = vo = <xo, yo>
+  segment normal     = n  = <xn, yn>   (Assumed to be normalized)
+  reflected velocity = v' = <x', y'>
+
+  From the following 2 equations:
+  v' = vo + k*n
+  || v' || = ||vo||
+
+  We get
+  x' = xo - 2(vo*n)xn
+  y' = yo - 2(vo*n)yn
+
+  i.e.
+  xo -= 2*(vo*n) * xn
+  yo -= 2*(vo*n) * yn
+  */
+  // TODO: Implement specific cases (vel.x *= -1 & vel.y *= -1)?
+  const DOT_VALUE = dotProduct(collisionNormal, circle.vel);
+  circle.vel.x -= 2*collisionNormal.x*DOT_VALUE;
+  circle.vel.y -= 2*collisionNormal.y*DOT_VALUE;
+
+
+  return DISTANCE_TO_COLLISION;
 }
 
 
-
-
-
-
-
-//
-// Collision Function
-//
-
-/*
-  :DDDDDD
-  
-  This isColliding method is very fast for what I need it to do.
-
-  40,000,000 calls took ~1.3 seconds
-*/
 
 /**
  * Determines whether the circle is colliding with
- * the given segment.
+ * the given segment. Return is NOT boolean.
+ * 
+ * Return looks like this:
+ * {
+ *  colliding: true/false,
+ *  normal: {x: num, y:num}
+ * }
  * 
  * If the circle is on the wrong side of the segment,
  * the collision _will_ still register, i.e. collisions
  * here are 2-sided.
  */
-export function isColliding (segment, circle) {
+function calculateCollisionInfo (segment, circle) {
+  // Default value is no collision
+  let collisionData = {
+    colliding: false,
+    normal: {x:0, y: 0}
+  }
+
   /*
   Lmao this math is on paper
 
@@ -204,29 +264,44 @@ export function isColliding (segment, circle) {
 
   // Check 1, distance
   // can say false with certainty
-  let distance = Math.abs(dotProduct(segment.normal, circle.center));
+  let v1 = differenceVector(segment.pointA, circle.pos);
+  let distance = Math.abs(dotProduct(segment.normal, v1));
   if (distance > circle.radius) {
-    return false;
+    return collisionData;
   }
 
 
   // Check 2, signage of vector & normal
   // can say true with certainty
-  let v1 = subtractVectors(segment.pointA, circle.center);
-  let v2 = subtractVectors(segment.pointB, circle.center);
-  let segVec = subtractVectors(segment.pointB, segment.pointA);
+  let v2 = differenceVector(segment.pointB, circle.pos);
+  let segVec = differenceVector(segment.pointB, segment.pointA);
 
   let dotA = dotProduct(v1, segVec);
   let dotB = dotProduct(v2, segVec);
   if ((dotA <= 0 && dotB >= 0) || (dotA >= 0 && dotB <= 0)) {
-    return true;
+    collisionData.colliding = true;
+    collisionData.normal = segment.normal;
+    return collisionData;
   }
 
   
   // Check 3, collision with endpoints
   // this is the final check to be exhaustive about collisions
-  return (sqDistanceBetweenPoints(segment.pointA, circle.center) <= circle.radius**2 ||
-          sqDistanceBetweenPoints(segment.pointB, circle.center) <= circle.radius**2)
+  let intersectsPointA = sqDistanceBetweenPoints(segment.pointA, circle.pos) <= circle.radius**2;
+  let intersectsPointB = sqDistanceBetweenPoints(segment.pointB, circle.pos) <= circle.radius**2;
+  
+  if (intersectsPointA) {
+    collisionData.colliding = true;
+    // Order matters!!!
+    let colNormal = normalizedVector(differenceVector(circle.pos, segment.pointA));
+    collisionData.normal = colNormal;
+  } else if (intersectsPointB) {
+    collisionData.colliding = true;
+    let colNormal = normalizedVector(differenceVector(circle.pos, segment.pointB));
+    collisionData.normal = colNormal;
+  }
+
+  return collisionData;
 }
 
 
@@ -236,11 +311,92 @@ export function isColliding (segment, circle) {
 
 
 
+//
+// Main Physics Loop
+//
+
+export function ballMoving (ball) {
+  return sqLengthOfVector(ball.vel) > EPSILON_ZERO;
+}
 
 
+// TODO: Check for reaching goal
+export function doPhysicsTick (simStatics, simDynamics) {
+  /*
+  Roughly, this loop likes this:
+
+  Per subframe:
+   - move forward
+   - check for collision
+  
+  - adjust velocity (usually a slow down due to friction)
+  */
+  
+  // Move forward
+  let ball = simDynamics.ball;
+  // const MAX_DIST_PER_SUBFRAME = ball.radius * 0.5;
+  const MAX_DIST_PER_SUBFRAME = ball.radius;
+
+  let speed = Math.sqrt(ball.vel.x**2  + ball.vel.y**2);
+  let totalDistanceLeft = speed; 
+
+  const MAX_SUBFRAMES = 20;
+  var subFrame = 0;
+  for (; subFrame<MAX_SUBFRAMES; subFrame++) {
+    if (totalDistanceLeft < EPSILON_ZERO) {
+      break;
+    }
+
+    // normalizedVector(...) creates a copy of the input vector
+    let normalizedVel = normalizedVector(ball.vel);
+    let adjustedVel = {...ball.vel};
+
+    let distanceMoved = 0;
+    let oldBall = {...ball};
+    oldBall.pos = {...ball.pos}; // pos is a dict, so when copied above it's by reference
+
+    if (speed <= MAX_DIST_PER_SUBFRAME) {
+      distanceMoved = speed;
+    } else {
+      distanceMoved = MAX_DIST_PER_SUBFRAME;
+      adjustedVel.x = normalizedVel.x * MAX_DIST_PER_SUBFRAME;
+      adjustedVel.y = normalizedVel.y * MAX_DIST_PER_SUBFRAME;
+    }
+
+    ball.pos.x += adjustedVel.x;
+    ball.pos.y += adjustedVel.y;
 
 
+    // Check for collision
+    let collidingSegments = [];
+    simStatics.walls.forEach((segment) => {
+      if (calculateCollisionInfo(segment, ball).colliding) {
+        collidingSegments.push(segment);
+      }
+    });
 
+    if (collidingSegments.length > 0) {
+      // distanceMoved = handleCollision(collidingSegments, ball, oldBall);
+      handleCollision(collidingSegments, ball, oldBall);
+    }
+
+    totalDistanceLeft -= distanceMoved;
+  }
+
+  // console.log(`Ball Vel X: ${ball.vel.x}`);
+
+
+  // Slow down the ball
+  if (speed <= GAMEPLAY_CONSTANTS.friction) {
+    ball.vel.x = 0;
+    ball.vel.y = 0;
+  } else {
+    let factor = 1 - GAMEPLAY_CONSTANTS.friction / speed;
+    factor *= GAMEPLAY_CONSTANTS.dampingCoef;
+    ball.vel.x *= factor;
+    ball.vel.y *= factor;
+  }
+}
 
 
 
