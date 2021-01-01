@@ -192,6 +192,27 @@ function updateBallContainer (simDynamics, ballContainer) {
 
 
 
+//
+// Logic for Launching
+//
+
+let launch = {
+  maxSpeed: 10
+}
+
+/**
+ * Will look at the balls 
+ */
+function launchBall () {
+
+}
+
+
+
+
+
+
+
 
 
 

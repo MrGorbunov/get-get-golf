@@ -61,7 +61,6 @@ decision and the engine should work with all values of these.
 
 // TODO: Maybe this should be generated and passed into functions?
 const GAMEPLAY_CONSTANTS = {
-  launchSpeed: 100,
   friction: 0.06,
   dampingCoef: 0.99 // Should be on range (0, 1], and ideally close to 1 (0.999 is good)
 }
