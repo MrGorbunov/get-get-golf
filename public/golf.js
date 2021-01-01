@@ -178,13 +178,6 @@ function generateDebugBallContainer (ballDict) {
 
   ballGraphic.position.set(ballDict.pos.x, ballDict.pos.y);
 
-  ballGraphic.interactive = true;
-  ballGraphic.buttonMode = true;
-  ballGraphic.on('pointerdown', launchWindup)
-            //  .on('pointermove', moveIndicator)
-             .on('pointerup', launchRelease)
-             .on('pointerupoutside', launchRelease)
-
   return ballGraphic;
 }
 
@@ -279,6 +272,14 @@ function setup () {
   containerGameplay.scale.set(3, 3);
 
   app.stage.addChild(containerGameplay);
+  
+  // And this allows actually launching the ball
+  containerBall.interactive = true;
+  containerBall.buttonMode = true;
+  containerBall.on('pointerdown', launchWindup)
+              //  .on('pointermove', moveIndicator)
+               .on('pointerup', launchRelease)
+               .on('pointerupoutside', launchRelease)
 
   app.ticker.add(delta => update(delta));
 }
