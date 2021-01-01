@@ -206,21 +206,29 @@ function updateBallContainer (simDynamics, ballContainer) {
 
 let launch = {
   maxSpeed: 10,
-  midSwing: false
+  speedFactor: 0.06,
+  ableToLaunch: false,
+  swingStart: {x: 0, y:0},
+  swingEnd: {x: 0, y:0}
 }
 
 function launchWindup (event) {
-  launch.midSwing = true;
+  launch.swingStart = {...event.data.global};
 }
 
 /**
  * Will look at the balls 
  */
 function launchRelease (event) {
-  if (launch.midSwing) {
-    launch.midSwing = false;
-    // let launchVec = 
+  launch.swingEnd = event.data.global;
+
+  let launchVec = Util.differenceVector(launch.swingStart, launch.swingEnd);
+  launchVec = Util.scaledVector(launchVec, launch.speedFactor);
+  if (Util.sqLengthOfVector(launchVec) > launch.maxSpeed**2) {
+    launchVec = Util.scaledVector(Util.normalizedVector(launchVec), launch.maxSpeed);
   }
+
+  simDynamics.ball.vel = launchVec;
 }
 
 

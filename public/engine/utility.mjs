@@ -50,6 +50,11 @@ export function differenceVector (vecA, vecB) {
   return {'x': vecA.x - vecB.x, 'y': vecA.y - vecB.y};
 }
 
+/**
+ * Will return a normalized version of the input vector.
+ * Creates a copy, does NOT mutate supplied vector.
+ * If supplied vector is close to 0, will return 0 vector.
+ */
 export function normalizedVector (vec) {
   if (Math.abs(vec.x) <= EPSILON_ZERO && Math.abs(vec.y) <= EPSILON_ZERO) {
     return {x: 0, y:0};
@@ -60,5 +65,12 @@ export function normalizedVector (vec) {
   localVec.x /= length;
   localVec.y /= length;
   return localVec;
+}
+
+export function scaledVector (vec, scalar) {
+  let copyVec = {...vec};
+  copyVec.x *= scalar;
+  copyVec.y *= scalar;
+  return copyVec;
 }
 
