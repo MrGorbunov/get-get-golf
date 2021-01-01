@@ -9,6 +9,7 @@ and become the ideal route.
 */
 
 import * as Sim from './engine/physics.mjs';
+import * as Util from './engine/utility.mjs';
 
 
 
@@ -177,6 +178,13 @@ function generateDebugBallContainer (ballDict) {
 
   ballGraphic.position.set(ballDict.pos.x, ballDict.pos.y);
 
+  ballGraphic.interactive = true;
+  ballGraphic.buttonMode = true;
+  ballGraphic.on('pointerdown', launchWindup)
+            //  .on('pointermove', moveIndicator)
+             .on('pointerup', launchRelease)
+             .on('pointerupoutside', launchRelease)
+
   return ballGraphic;
 }
 
@@ -197,14 +205,22 @@ function updateBallContainer (simDynamics, ballContainer) {
 //
 
 let launch = {
-  maxSpeed: 10
+  maxSpeed: 10,
+  midSwing: false
+}
+
+function launchWindup (event) {
+  launch.midSwing = true;
 }
 
 /**
  * Will look at the balls 
  */
-function launchBall () {
-
+function launchRelease (event) {
+  if (launch.midSwing) {
+    launch.midSwing = false;
+    // let launchVec = 
+  }
 }
 
 

@@ -32,6 +32,7 @@ segment: {
 }
 */
 
+import * as Util from './utility.mjs';
 
 
 
@@ -44,21 +45,6 @@ segment: {
 // Physics Constants
 //
 
-/*
-Engine constants:
-Mostly just epsilons for float comparisons. They should not
-be adjusted as they are set for stability.
-*/
-
-const EPSILON_ZERO = 0.00001;
-
-
-/*
-Gameplay constants:
-Stuff like friction, damping, etc. Tweaking these is a game-design
-decision and the engine should work with all values of these.
-*/
-
 // TODO: Maybe this should be generated and passed into functions?
 const GAMEPLAY_CONSTANTS = {
   friction: 0.06,
@@ -66,57 +52,6 @@ const GAMEPLAY_CONSTANTS = {
 }
 
 
-
-
-
-
-
-
-
-//
-// Math Utility Functions
-//
-// All functoins return their value, there are NO mutations
-
-function sqDistanceBetweenPoints (pointA, pointB) {
-  return (pointA.x - pointB.x)**2 + (pointA.y - pointB.y)**2;
-}
-
-function distanceBetweenPoints (pointA, pointB) {
-  return Math.sqrt((pointA.x - pointB.x)**2 + (pointA.y - pointB.y)**2);
-}
-
-function sqLengthOfVector (vec) {
-  return vec.x**2 + vec.y**2;
-}
-
-function lengthOfVector (vec) {
-  return Math.sqrt(vec.x**2 + vec.y**2);
-}
-
-function dotProduct (vecA, vecB) {
-  return vecA.x * vecB.x + vecA.y * vecB.y;
-}
-
-/**
- * Returns A - B
- * i.e. the vector from B -> A
- */
-function differenceVector (vecA, vecB) {
-  return {'x': vecA.x - vecB.x, 'y': vecA.y - vecB.y};
-}
-
-function normalizedVector (vec) {
-  if (Math.abs(vec.x) <= EPSILON_ZERO && Math.abs(vec.y) <= EPSILON_ZERO) {
-    return {x: 0, y:0};
-  }
-  
-  let localVec = {...vec}
-  const length = lengthOfVector(localVec);
-  localVec.x /= length;
-  localVec.y /= length;
-  return localVec;
-}
 
 
 
@@ -191,8 +126,8 @@ function handleCollision (segmentArr, circle, oldCircle) {
   collisionPos.y = ogPosition.y + percentDistance*(finalPosition.y - ogPosition.y);
   
   // This gets returned at the end
-  const DISTANCE_TO_COLLISION = percentDistance * Math.sqrt(
-      sqDistanceBetweenPoints(collisionPos, ogPosition));
+  const DISTANCE_TO_COLLISION = percentDistance *
+      Util.distanceBetweenPoints(collisionPos, ogPosition);
 
   // Ultimately we need to update the incoming circle
   circle.pos = collisionPos;
@@ -219,7 +154,7 @@ function handleCollision (segmentArr, circle, oldCircle) {
   yo -= 2*(vo*n) * yn
   */
   // TODO: Implement specific cases (vel.x *= -1 & vel.y *= -1)?
-  const DOT_VALUE = dotProduct(collisionNormal, circle.vel);
+  const DOT_VALUE = Util.dotProduct(collisionNormal, circle.vel);
   circle.vel.x -= 2*collisionNormal.x*DOT_VALUE;
   circle.vel.y -= 2*collisionNormal.y*DOT_VALUE;
 
@@ -263,8 +198,8 @@ function calculateCollisionInfo (segment, circle) {
 
   // Check 1, distance
   // can say false with certainty
-  let v1 = differenceVector(segment.pointA, circle.pos);
-  let distance = Math.abs(dotProduct(segment.normal, v1));
+  let v1 = Util.differenceVector(segment.pointA, circle.pos);
+  let distance = Math.abs(Util.dotProduct(segment.normal, v1));
   if (distance > circle.radius) {
     return collisionData;
   }
@@ -272,11 +207,11 @@ function calculateCollisionInfo (segment, circle) {
 
   // Check 2, signage of vector & normal
   // can say true with certainty
-  let v2 = differenceVector(segment.pointB, circle.pos);
-  let segVec = differenceVector(segment.pointB, segment.pointA);
+  let v2 = Util.differenceVector(segment.pointB, circle.pos);
+  let segVec = Util.differenceVector(segment.pointB, segment.pointA);
 
-  let dotA = dotProduct(v1, segVec);
-  let dotB = dotProduct(v2, segVec);
+  let dotA = Util.dotProduct(v1, segVec);
+  let dotB = Util.dotProduct(v2, segVec);
   if ((dotA <= 0 && dotB >= 0) || (dotA >= 0 && dotB <= 0)) {
     collisionData.colliding = true;
     collisionData.normal = segment.normal;
@@ -286,17 +221,17 @@ function calculateCollisionInfo (segment, circle) {
   
   // Check 3, collision with endpoints
   // this is the final check to be exhaustive about collisions
-  let intersectsPointA = sqDistanceBetweenPoints(segment.pointA, circle.pos) <= circle.radius**2;
-  let intersectsPointB = sqDistanceBetweenPoints(segment.pointB, circle.pos) <= circle.radius**2;
+  let intersectsPointA = Util.sqDistanceBetweenPoints(segment.pointA, circle.pos) <= circle.radius**2;
+  let intersectsPointB = Util.sqDistanceBetweenPoints(segment.pointB, circle.pos) <= circle.radius**2;
   
   if (intersectsPointA) {
     collisionData.colliding = true;
     // Order matters!!!
-    let colNormal = normalizedVector(differenceVector(circle.pos, segment.pointA));
+    let colNormal = Util.normalizedVector(Util.differenceVector(circle.pos, segment.pointA));
     collisionData.normal = colNormal;
   } else if (intersectsPointB) {
     collisionData.colliding = true;
-    let colNormal = normalizedVector(differenceVector(circle.pos, segment.pointB));
+    let colNormal = Util.normalizedVector(Util.differenceVector(circle.pos, segment.pointB));
     collisionData.normal = colNormal;
   }
 
@@ -315,7 +250,7 @@ function calculateCollisionInfo (segment, circle) {
 //
 
 export function ballMoving (ball) {
-  return sqLengthOfVector(ball.vel) > EPSILON_ZERO;
+  return Util.sqLengthOfVector(ball.vel) > Util.EPSILON_ZERO;
 }
 
 
@@ -342,12 +277,12 @@ export function doPhysicsTick (simStatics, simDynamics) {
   const MAX_SUBFRAMES = 20;
   var subFrame = 0;
   for (; subFrame<MAX_SUBFRAMES; subFrame++) {
-    if (totalDistanceLeft < EPSILON_ZERO) {
+    if (totalDistanceLeft < Util.EPSILON_ZERO) {
       break;
     }
 
     // normalizedVector(...) creates a copy of the input vector
-    let normalizedVel = normalizedVector(ball.vel);
+    let normalizedVel = Util.normalizedVector(ball.vel);
     let adjustedVel = {...ball.vel};
 
     let distanceMoved = 0;
