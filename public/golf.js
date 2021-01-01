@@ -65,6 +65,11 @@ let simConstants = {
 //
 // In the future should also have an outer bounding box
 let simStatics = {
+  goal: {
+    pos: {x: 75, y:25},
+    radius: 15
+  },
+
   walls: [
    {
     pointA: { x: 50, y: 0 },
@@ -101,16 +106,7 @@ let simStatics = {
     pointB: { x: 50, y: 0 },
     normal: { x: 0.7071067811865475, y: 0.7071067811865475 }
   }
-
-
-    
-
-
   ],
-
-  obstacles: [
-    // *chirp* *chirp*
-  ]
 }
 
 let simDynamics = {
@@ -128,10 +124,11 @@ let simDynamics = {
 
 
 const DEBUG_PALLETE = {
-  'background': 0x383221,
-  'obstacles': 0xed8c78,
+  'background': 0x383221, // #383221
+  'obstacles': 0xed8c78,  // #ed8c78
+  'goal': 0xfd9c98,       // #bd5c58
   // 'normals': 0x,
-  'ball': 0x8cbace
+  'ball': 0x8cbace        // #8cbace
 }
 
 
@@ -139,11 +136,9 @@ const DEBUG_PALLETE = {
 // TODO: Draw normals for the segments & velocity for the ball
 
 /**
- * Returns a Container (PIXI.Graphics) containing a line
- * segment for each line segment in simStatics. Specifically,
- * it loops through simStatics.walls for segments,
- * 
- * // TODO: Also loop through simStatics.obstacles
+ * Returns a Container (PIXI.Graphics) with graphics representing
+ * simStatics. It loops through simStatics.walls for segments & 
+ * also draws simStatics.goal.
  */
 function generateDebugStaticsContainer (simStatics) {
 
@@ -155,6 +150,12 @@ function generateDebugStaticsContainer (simStatics) {
     wallsGraphic.moveTo(segment.pointA.x, segment.pointA.y);
     wallsGraphic.lineTo(segment.pointB.x, segment.pointB.y);
   });
+
+  // And now we draw the goal (circle);
+  wallsGraphic.beginFill(DEBUG_PALLETE.goal);
+  wallsGraphic.lineStyle(0);
+  let goal = simStatics.goal;
+  wallsGraphic.drawCircle(goal.pos.x, goal.pos.y, goal.radius);
 
   return wallsGraphic;
 }
@@ -191,6 +192,7 @@ function generateDebugBallContainer (ballDict) {
 const EPSILON_ZERO = 0.00001;
 
 
+// TODO: Check for reaching goal
 function doPhysicsTick (simConstants, simStatics, simDynamics) {
   /*
   Roughly, this loop likes this:
