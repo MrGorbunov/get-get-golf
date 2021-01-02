@@ -47,7 +47,11 @@ export function dotProduct (vecA, vecB) {
  * i.e. the vector from B -> A
  */
 export function differenceVector (vecA, vecB) {
-  return {'x': vecA.x - vecB.x, 'y': vecA.y - vecB.y};
+  return {x: vecA.x - vecB.x, y: vecA.y - vecB.y};
+}
+
+export function sumVector (vecA, vecB) {
+  return {x: vecA.x + vecB.x, y: vecA.y + vecB.y};
 }
 
 /**
