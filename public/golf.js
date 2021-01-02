@@ -193,35 +193,153 @@ function updateBallContainer (simDynamics, ballContainer) {
 
 
 
+
+
+
+
+
+
+
+
+
 //
-// Logic for Launching
+// State Logic
 //
 
-let launch = {
-  maxSpeed: 10,
-  speedFactor: 0.06,
-  ableToLaunch: false,
+let stateFunction = stateWindup;
+
+
+//
+// Ball Swinging
+
+let swingData = {
+  maxSpeed: 7,
+  speedFactor: 0.2,
+  readyToSwing: false,
+  midSwing: false,
+  cancelSwing: false,
   swingStart: {x: 0, y:0},
   swingEnd: {x: 0, y:0}
 }
 
-function launchWindup (event) {
-  launch.swingStart = {...event.data.global};
-}
-
-/**
- * Will look at the balls 
- */
-function launchRelease (event) {
-  launch.swingEnd = event.data.global;
-
-  let launchVec = Util.differenceVector(launch.swingStart, launch.swingEnd);
-  launchVec = Util.scaledVector(launchVec, launch.speedFactor);
-  if (Util.sqLengthOfVector(launchVec) > launch.maxSpeed**2) {
-    launchVec = Util.scaledVector(Util.normalizedVector(launchVec), launch.maxSpeed);
+// These 4 functions are linked to interaction with the ball container
+function windupStart (event) {
+  if (stateFunction !== stateWindup) {
+    return;
   }
 
-  simDynamics.ball.vel = launchVec;
+  swingData.midSwing = true;
+  swingData.swingStart = containerBall.position;
+}
+
+function windupAdjusted (event) {
+  swingData.swingEnd = containerGameplay.toLocal(event.data.global);
+}
+
+function windupEnd (event) {
+  if (stateFunction !== stateWindup) {
+    return;
+  }
+
+  swingData.swingEnd = containerGameplay.toLocal(event.data.global);
+  swingData.readyToSwing = true;
+}
+
+function windupCancel (event) {
+  if (stateFunction !== stateWindup) {
+    return;
+  }
+
+  swingData.cancelSwing = true;
+}
+
+
+//
+// Actual state calls
+
+function stateWindup () {
+  containerIndicator.visible = swingData.midSwing;
+  if (!swingData.midSwing) {
+    return;
+  }
+
+  if (swingData.cancelSwing) {
+    simDynamics.ball.vel = {x:0, y:0};
+    stateFunction = stateSimulate;
+    transitionWindupToSimulate();
+    return;
+
+  } else if (swingData.readyToSwing) {
+    let swingVec = Util.differenceVector(swingData.swingStart, swingData.swingEnd);
+    swingVec = Util.scaledVector(swingVec, swingData.speedFactor);
+    if (Util.sqLengthOfVector(swingVec) > swingData.maxSpeed**2) {
+      swingVec = Util.scaledVector(Util.normalizedVector(swingVec), swingData.maxSpeed);
+    }
+    simDynamics.ball.vel = swingVec;
+
+    transitionWindupToSimulate();
+    return;
+  }
+
+
+  // Position of of indicator should be on opposite side of ball
+  /*
+      Indicator
+       \
+        Ball
+         \
+          Cursor
+
+    This means that indicator position = ball.pos + vec(cursor -> ball)
+  */
+
+  let cursorToBallVec = Util.differenceVector(swingData.swingStart, swingData.swingEnd);
+  let indicatorPos = Util.sumVector(simDynamics.ball.pos, cursorToBallVec);
+  containerIndicator.position = indicatorPos;
+}
+
+
+
+
+
+
+//
+// Physics state calls
+
+// Very little here because everything is in its own module
+
+function stateSimulate () {
+  Sim.doPhysicsTick(simStatics, simDynamics);
+  updateBallContainer(simDynamics, containerBall)
+
+  if (!Sim.ballMoving(simDynamics.ball)) {
+    transitionSimulateToWindup();
+  }
+}
+
+
+
+
+//
+// State transition functions
+
+// The # of transitions possible is O(n^2) with respect
+// to # of states. However, right now there are 2 states
+// and also not all states necessarily transition to each other.
+
+function transitionSimulateToWindup () {
+  containerIndicator.position = {...containerBall.position};
+
+  stateFunction = stateWindup;
+}
+
+function transitionWindupToSimulate () {
+  containerIndicator.visible = false;
+  swingData.cancelSwing = false;
+  swingData.readyToSwing = false;
+  swingData.midSwing = false;
+
+  stateFunction = stateSimulate;
 }
 
 
@@ -233,13 +351,14 @@ function launchRelease (event) {
 
 
 
+//
+// Highest level calls
+//
 
-
-
-
-
+// Gameplay graphics containers
 let containerGameplay;
 let containerStatics;
+let containerIndicator;
 let containerBall;
 
 let app = new PIXI.Application({
@@ -258,46 +377,43 @@ PIXI.loader.load(setup);
 
 
 
+
+
+
+
+
+
 function setup () {
   containerStatics = generateDebugStaticsContainer(simStatics);
-  // Basically, each dynamic will be its own container so that
-  // position can just be update every frame.
   containerBall = generateDebugBallContainer(simDynamics.ball);
+  containerIndicator = generateDebugBallContainer({pos:{x:0, y:0}, radius:5});
 
   containerGameplay = new PIXI.Container();
   containerGameplay.addChild(containerStatics);
+  containerGameplay.addChild(containerIndicator);
   containerGameplay.addChild(containerBall);
 
-  containerGameplay.position.set(20, 20);
-  containerGameplay.scale.set(3, 3);
+  containerGameplay.setTransform(
+    20, 20,  // position (x, y)
+    3, 3     // scale (x, y)
+  );
 
   app.stage.addChild(containerGameplay);
   
   // And this allows actually launching the ball
   containerBall.interactive = true;
   containerBall.buttonMode = true;
-  containerBall.on('pointerdown', launchWindup)
-              //  .on('pointermove', moveIndicator)
-               .on('pointerup', launchRelease)
-               .on('pointerupoutside', launchRelease)
+  containerBall.on('pointerdown', windupStart)
+               .on('pointermove', windupAdjusted)
+               .on('pointerup', windupCancel)
+               .on('pointerupoutside', windupEnd)
 
   app.ticker.add(delta => update(delta));
 }
 
 
-
-
 function update (delta) {
-  // If the ball is moving we want to keep simulating
-  if (Sim.ballMoving(simDynamics.ball)) {
-    Sim.doPhysicsTick(simStatics, simDynamics);
-    updateBallContainer(simDynamics, containerBall);
-
-  // When it stops we can take input
-  } else {
-
-  }
-
+  stateFunction();
 }
 
 
