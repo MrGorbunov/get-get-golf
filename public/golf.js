@@ -262,8 +262,12 @@ function windupCancel (event) {
 }
 
 
+
+
+
+
 //
-// Windup state
+// Actual state calls
 
 // TODO: It may make sense to split up windup into 2 states, one for aiming and one for idle
 function stateWindup () {
@@ -312,15 +316,6 @@ function stateWindup () {
 }
 
 
-
-
-
-
-//
-// Physics state calls
-
-// Very little here because everything is in its own module
-
 function stateSimulate () {
   Sim.doPhysicsTick(simStatics, simDynamics);
   updateBallContainer(simDynamics, containerBall)
@@ -328,9 +323,12 @@ function stateSimulate () {
   if (!Sim.ballMoving(simDynamics.ball)) {
     exitSimulate();
     enterWindup();
+
+  } else if (Sim.inGoal(simStatics, simDynamics.ball)) {
+    exitSimulate();
+    enterFinished();
   }
 }
-
 
 
 function stateFinished () {
@@ -365,8 +363,8 @@ function enterWindup () {
 }
 
 
-function enterVictory () {
-  return;
+function enterFinished () {
+  stateFunction = stateFinished;
 }
 
 
