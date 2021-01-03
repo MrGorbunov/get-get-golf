@@ -206,6 +206,14 @@ function updateBallContainer (simDynamics, ballContainer) {
 // State Logic
 //
 
+/*
+There are 3 states:
+- windup: for actually hitting the ball around
+- simulate: when the ball is in motion
+- finished: once the ball goes through the goal
+
+*/
+
 let stateFunction = stateWindup;
 
 
@@ -213,8 +221,8 @@ let stateFunction = stateWindup;
 // Ball Swinging
 
 let swingData = {
-  maxSpeed: 7,
-  speedFactor: 0.2,
+  maxSpeed: 8,
+  speedFactor: 0.17,
   readyToSwing: false,
   midSwing: false,
   cancelSwing: false,
@@ -255,8 +263,9 @@ function windupCancel (event) {
 
 
 //
-// Actual state calls
+// Windup state
 
+// TODO: It may make sense to split up windup into 2 states, one for aiming and one for idle
 function stateWindup () {
   containerIndicator.visible = swingData.midSwing;
   if (!swingData.midSwing) {
@@ -266,21 +275,26 @@ function stateWindup () {
   if (swingData.cancelSwing) {
     simDynamics.ball.vel = {x:0, y:0};
     stateFunction = stateSimulate;
-    transitionWindupToSimulate();
-    return;
-
-  } else if (swingData.readyToSwing) {
-    let swingVec = Util.differenceVector(swingData.swingStart, swingData.swingEnd);
-    swingVec = Util.scaledVector(swingVec, swingData.speedFactor);
-    if (Util.sqLengthOfVector(swingVec) > swingData.maxSpeed**2) {
-      swingVec = Util.scaledVector(Util.normalizedVector(swingVec), swingData.maxSpeed);
-    }
-    simDynamics.ball.vel = swingVec;
-
-    transitionWindupToSimulate();
+    exitWindup();
+    enterSimulate();
     return;
   }
 
+  let cursorToBallVec = Util.differenceVector(swingData.swingStart, swingData.swingEnd);
+  let swingVec = Util.scaledVector(cursorToBallVec, swingData.speedFactor);
+  const sqVecLength = Util.sqLengthOfVector(swingVec);
+  if (sqVecLength > swingData.maxSpeed**2) {
+    swingVec = Util.scaledVector(Util.normalizedVector(swingVec), swingData.maxSpeed);
+    cursorToBallVec = Util.scaledVector(Util.normalizedVector(cursorToBallVec), swingData.maxSpeed / swingData.speedFactor);
+  }
+
+  if (swingData.readyToSwing) {
+    simDynamics.ball.vel = swingVec;
+
+    exitWindup();
+    enterSimulate();
+    return;
+  }
 
   // Position of of indicator should be on opposite side of ball
   /*
@@ -293,7 +307,6 @@ function stateWindup () {
     This means that indicator position = ball.pos + vec(cursor -> ball)
   */
 
-  let cursorToBallVec = Util.differenceVector(swingData.swingStart, swingData.swingEnd);
   let indicatorPos = Util.sumVector(simDynamics.ball.pos, cursorToBallVec);
   containerIndicator.position = indicatorPos;
 }
@@ -313,8 +326,15 @@ function stateSimulate () {
   updateBallContainer(simDynamics, containerBall)
 
   if (!Sim.ballMoving(simDynamics.ball)) {
-    transitionSimulateToWindup();
+    exitSimulate();
+    enterWindup();
   }
+}
+
+
+
+function stateFinished () {
+
 }
 
 
@@ -323,25 +343,31 @@ function stateSimulate () {
 //
 // State transition functions
 
-// The # of transitions possible is O(n^2) with respect
-// to # of states. However, right now there are 2 states
-// and also not all states necessarily transition to each other.
-
-function transitionSimulateToWindup () {
-  containerIndicator.position = {...containerBall.position};
-
-  stateFunction = stateWindup;
+function exitSimulate () {
+  return;
 }
 
-function transitionWindupToSimulate () {
+function enterSimulate () {
+  stateFunction = stateSimulate;
+}
+
+
+function exitWindup () {
   containerIndicator.visible = false;
   swingData.cancelSwing = false;
   swingData.readyToSwing = false;
   swingData.midSwing = false;
-
-  stateFunction = stateSimulate;
 }
 
+function enterWindup () {
+  containerIndicator.position = {...containerBall.position};
+  stateFunction = stateWindup;
+}
+
+
+function enterVictory () {
+  return;
+}
 
 
 
