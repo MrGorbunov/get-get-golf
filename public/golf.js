@@ -278,11 +278,11 @@ function stateWindup () {
 
   if (swingData.cancelSwing) {
     simDynamics.ball.vel = {x:0, y:0};
-    stateFunction = stateSimulate;
     exitWindup();
     enterSimulate();
     return;
   }
+
 
   let cursorToBallVec = Util.differenceVector(swingData.swingStart, swingData.swingEnd);
   let swingVec = Util.scaledVector(cursorToBallVec, swingData.speedFactor);
@@ -310,7 +310,6 @@ function stateWindup () {
 
     This means that indicator position = ball.pos + vec(cursor -> ball)
   */
-
   let indicatorPos = Util.sumVector(simDynamics.ball.pos, cursorToBallVec);
   containerIndicator.position = indicatorPos;
 }
