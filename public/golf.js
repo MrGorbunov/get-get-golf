@@ -62,7 +62,7 @@ let gameModel = {
 let simStatics = {
   goal: {
     pos: {x: 75, y:25},
-    radius: 15
+    // radius: 15
   },
 
   walls: [
@@ -262,12 +262,8 @@ function windupCancel (event) {
 }
 
 
-
-
-
-
 //
-// Actual state calls
+// Windup state
 
 // TODO: It may make sense to split up windup into 2 states, one for aiming and one for idle
 function stateWindup () {
@@ -278,11 +274,11 @@ function stateWindup () {
 
   if (swingData.cancelSwing) {
     simDynamics.ball.vel = {x:0, y:0};
+    stateFunction = stateSimulate;
     exitWindup();
     enterSimulate();
     return;
   }
-
 
   let cursorToBallVec = Util.differenceVector(swingData.swingStart, swingData.swingEnd);
   let swingVec = Util.scaledVector(cursorToBallVec, swingData.speedFactor);
@@ -310,10 +306,20 @@ function stateWindup () {
 
     This means that indicator position = ball.pos + vec(cursor -> ball)
   */
+
   let indicatorPos = Util.sumVector(simDynamics.ball.pos, cursorToBallVec);
   containerIndicator.position = indicatorPos;
 }
 
+
+
+
+
+
+//
+// Physics state calls
+
+// Very little here because everything is in its own module
 
 function stateSimulate () {
   Sim.doPhysicsTick(simStatics, simDynamics);
@@ -322,12 +328,9 @@ function stateSimulate () {
   if (!Sim.ballMoving(simDynamics.ball)) {
     exitSimulate();
     enterWindup();
-
-  } else if (Sim.inGoal(simStatics, simDynamics.ball)) {
-    exitSimulate();
-    enterFinished();
   }
 }
+
 
 
 function stateFinished () {
@@ -362,8 +365,8 @@ function enterWindup () {
 }
 
 
-function enterFinished () {
-  stateFunction = stateFinished;
+function enterVictory () {
+  return;
 }
 
 

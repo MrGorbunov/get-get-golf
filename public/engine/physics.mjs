@@ -249,19 +249,12 @@ function calculateCollisionInfo (segment, circle) {
 // Main Physics Loop
 //
 
-// TODO: Really, doPhysicsTick should return a dictionary with info about ball speed & goal status
-
 export function ballMoving (ball) {
   return Util.sqLengthOfVector(ball.vel) > Util.EPSILON_ZERO;
 }
 
 
-export function inGoal (simStatics, ball) {
-  const sqDistBetween = Util.sqDistanceBetweenPoints(simStatics.goal.pos, ball.pos);
-  return sqDistBetween <= simStatics.goal.radius**2;
-}
-
-
+// TODO: Check for reaching goal
 export function doPhysicsTick (simStatics, simDynamics) {
   /*
   Roughly, this loop likes this:
