@@ -465,7 +465,7 @@ let containerIndicator;
 let containerBall;
 
 let app = new PIXI.Application({
-  width: 400,
+  width: 700,
   height: 400,
   antialias: true,
   resolution: 1,
@@ -489,7 +489,7 @@ PIXI.loader.load(setup);
 function setup () {
   containerStatics = generateDebugStaticsContainer(simStatics);
   containerBall = generateDebugBallContainer(simDynamics.ball);
-  containerIndicator = generateDebugBallContainer({pos:{x:0, y:0}, radius:5});
+  containerIndicator = generateDebugBallContainer({pos:{x:0, y:0}, radius:3});
 
   containerGameplay = new PIXI.Container();
   containerGameplay.addChild(containerStatics);
@@ -497,7 +497,7 @@ function setup () {
   containerGameplay.addChild(containerBall);
 
   containerGameplay.setTransform(
-    20, 20,  // position (x, y)
+    20, 40,  // position (x, y)
     3, 3     // scale (x, y)
   );
 
