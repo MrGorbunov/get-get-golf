@@ -231,10 +231,10 @@ function generateDebugStaticsContainer (simStatics) {
   });
 
   // And now we draw the goal (circle);
-  wallsGraphic.beginFill(DEBUG_PALLETE.goal);
-  wallsGraphic.lineStyle(0);
-  let goal = simStatics.goal;
-  wallsGraphic.drawCircle(goal.pos.x, goal.pos.y, goal.radius);
+  // wallsGraphic.beginFill(DEBUG_PALLETE.goal);
+  // wallsGraphic.lineStyle(0);
+  // let goal = simStatics.goal;
+  // wallsGraphic.drawCircle(goal.pos.x, goal.pos.y, goal.radius);
 
   return wallsGraphic;
 }
