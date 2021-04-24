@@ -60,10 +60,10 @@ let gameModel = {
 //
 // In the future should also have an outer bounding box
 let simStatics = {
-  goal: {
-    pos: {x: 75, y:25},
-    // radius: 15
-  },
+  // goal: {
+  //   pos: {x: 75, y:25},
+  //   radius: 15
+  // },
 
   walls: [
    {
@@ -73,11 +73,88 @@ let simStatics = {
   },
   {
     pointA: { x: 100, y: 0 },
-    pointB: { x: 100, y: 50 },
+    pointB: { x: 100, y: 30 },
     normal: { x: -1, y: 0 }
   },
+
+
+  /* Right side Section */
   {
-    pointA: { x: 100, y: 50 },
+	pointA: { x: 100, y: 30 },
+    pointB: { x: 125, y: 55 },
+    normal: { x: -0.7071067811865475, y: 0.7071067811865475 }
+  },
+  {
+	pointA: { x: 130, y: 55 },
+    pointB: { x: 125, y: 55 },
+    normal: { x: 0, y: 1 }
+  },
+  {
+	pointA: { x: 130, y: 55 },
+    pointB: { x: 130, y: 0 },
+    normal: { x: 1, y: 0 }
+  },
+  {
+	pointA: { x: 190, y: 0 },
+    pointB: { x: 130, y: 0 },
+    normal: { x: 0, y: -1 }
+  },
+  {
+	pointA: { x: 190, y: 0 },
+    pointB: { x: 190, y: 50 },
+    normal: { x: 1, y: 0 }
+  },
+
+  /* All those small lines */
+  {
+	pointA: { x: 130, y: 55 },
+    pointB: { x: 160, y: 55 },
+    normal: { x: 0, y: 1 }
+  },
+  {
+	pointA: { x: 130, y: 34 },
+    pointB: { x: 160, y: 34 },
+    normal: { x: 0, y: 1 }
+  },
+  {
+	pointA: { x: 130, y: 15 },
+    pointB: { x: 160, y: 15 },
+    normal: { x: 0, y: 1 }
+  },
+
+
+
+
+  /* Bottom Right */
+  {
+    pointA: { x: 190, y: 50 },
+    pointB: { x: 200, y: 95 },
+    normal: { x: -0.9761871, y: 0.2169305 }
+  },
+  {
+	pointA: { x: 170, y: 100 },
+    pointB: { x: 200, y: 95 },
+    normal: { x: 0.16439899, y: 0.986394 }
+  },
+  {
+	pointA: { x: 170, y: 100 },
+    pointB: { x: 150, y: 90 },
+    normal: { x: -0.447214, y: 0.8944272 }
+  },
+  {
+	pointA: { x: 135, y: 100 },
+    pointB: { x: 150, y: 90 },
+    normal: { x: 0.5547002, y: 0.8320502 }
+  },
+  {
+	pointA: { x: 85, y: 50 },
+    pointB: { x: 135, y: 100 },
+    normal: { x: 0.7071067811865475, y: -0.7071067811865475 }
+  },
+  /* Back to left side */
+
+  {
+    pointA: { x: 85, y: 50 },
     pointB: { x: 50, y: 50 },
     normal: { x: 0, y: -1 }
   },
@@ -108,7 +185,7 @@ let simDynamics = {
   ball: {
     pos: {x: 40, y:40},
     vel: {x: 10, y:1},
-    radius: 4,
+    radius: 6,
   }
 }
 
