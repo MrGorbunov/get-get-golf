@@ -108,7 +108,7 @@ let simDynamics = {
   ball: {
     pos: {x: 40, y:40},
     vel: {x: 10, y:1},
-    radius: 10,
+    radius: 4,
   }
 }
 
